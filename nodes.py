@@ -111,32 +111,25 @@ class MossTTSDNode:
             # Since codec path logic is similar, we could add a folder for it too,
             # currently just treating it as raw string or HF Hub ID unless we add specific folder logic.
         
-        # Workaround for transformers bug with "v1.0" in repo name causing import errors
+        # Use local model path if default HF Hub ID is specified
         if model_path == "OpenMOSS-Team/MOSS-TTSD-v1.0":
             try:
-                from huggingface_hub import snapshot_download
                 import os
-                
-                # Define sanitized local path
-                # Use folder_paths if available, otherwise relative to current file
+
+                # Use the existing v1.0 directory
                 if folder_paths:
                     base_path = os.path.join(folder_paths.models_dir, "moss_ttsd")
                 else:
                     base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "moss_ttsd")
-                
-                sanitized_name = "MOSS-TTSD-v1_0" # Replace dot with underscore
-                local_model_path = os.path.join(base_path, sanitized_name)
-                
-                if not os.path.exists(local_model_path):
-                    print(f"Downloading MOSS-TTSD to {local_model_path} to avoid import errors...")
-                    snapshot_download(repo_id=model_path, local_dir=local_model_path)
-                
-                print(f"Redirecting 'OpenMOSS-Team/MOSS-TTSD-v1.0' to local sanitized path: {local_model_path}")
-                model_path = local_model_path
-                
+
+                local_model_path = os.path.join(base_path, "MOSS-TTSD-v1.0")
+
+                if os.path.exists(local_model_path):
+                    print(f"Using local MOSS-TTSD path: {local_model_path}")
+                    model_path = local_model_path
+
             except Exception as e:
-                print(f"Failed to auto-download/redirect model: {e}")
-                print("Falling back to default HF loading (might fail with ModuleNotFoundError).")
+                print(f"Failed to redirect to local model: {e}")
 
         # Auto-download Tokenizer/Codec if default
         if codec_path == "OpenMOSS-Team/MOSS-Audio-Tokenizer":
@@ -169,10 +162,8 @@ class MossTTSDNode:
                 model_path,
                 trust_remote_code=True,
                 codec_path=codec_path,
-                use_fast=False,
             )
-            self.processor.audio_tokenizer = self.processor.audio_tokenizer.to(self.device).eval()
-            
+
             attn_implementation = "flash_attention_2" if self.device == "cuda" else "sdpa"
             try:
                 self.model = AutoModel.from_pretrained(
@@ -180,7 +171,9 @@ class MossTTSDNode:
                     trust_remote_code=True,
                     attn_implementation=attn_implementation,
                     torch_dtype=self.dtype,
-                ).to(self.device).eval()
+                    device_map="auto",
+                    low_cpu_mem_usage=True,
+                ).eval()
             except Exception as e:
                 print(f"Failed to load with flash_attention_2, falling back to sdpa: {e}")
                 self.model = AutoModel.from_pretrained(
@@ -188,7 +181,13 @@ class MossTTSDNode:
                     trust_remote_code=True,
                     attn_implementation="sdpa",
                     torch_dtype=self.dtype,
-                ).to(self.device).eval()
+                    device_map="auto",
+                    low_cpu_mem_usage=True,
+                ).eval()
+
+            # Keep audio_tokenizer on CPU to save VRAM, move to GPU only when needed
+            self.processor.audio_tokenizer = self.processor.audio_tokenizer.cpu().eval()
+            self._audio_tokenizer_device = "cpu"
 
     def preprocess_audio(self, audio_data, target_sr):
         # ComfyUI audio format: {"waveform": tensor(ch, samples), "sample_rate": int}
@@ -240,7 +239,7 @@ class MossTTSDNode:
             ref_wavs = []
             if reference_audio_s1: ref_wavs.append(self.preprocess_audio(reference_audio_s1, target_sr))
             if reference_audio_s2: ref_wavs.append(self.preprocess_audio(reference_audio_s2, target_sr))
-            
+
             # Handle empty ref (no cloning?)
             if not ref_wavs:
                  # What if no reference? Use pre-trained voices?
@@ -249,19 +248,33 @@ class MossTTSDNode:
                  # The example uses "continuation" mode.
                  pass
 
-            reference_audio_codes = self.processor.encode_audios_from_wav(ref_wavs, sampling_rate=target_sr)
-            
+            # Move audio_tokenizer to GPU temporarily for encoding
+            import torch
+            if hasattr(self, '_audio_tokenizer_device') and self._audio_tokenizer_device == "cpu":
+                torch.cuda.empty_cache()
+                self.processor.audio_tokenizer = self.processor.audio_tokenizer.to(self.device)
+                print(f"[MOSS-TTSD] Moved audio_tokenizer to {self.device} for encoding")
+
+            try:
+                reference_audio_codes = self.processor.encode_audios_from_wav(ref_wavs, sampling_rate=target_sr)
+            finally:
+                # Move back to CPU to free VRAM
+                if hasattr(self, '_audio_tokenizer_device') and self._audio_tokenizer_device == "cpu":
+                    self.processor.audio_tokenizer = self.processor.audio_tokenizer.cpu()
+                    torch.cuda.empty_cache()
+                    print(f"[MOSS-TTSD] Moved audio_tokenizer back to CPU, freed VRAM")
+
             # For prompt_audio (assistant message start), example concatenates prompts
             # concat_prompt_wav = torch.cat([wav1, wav2], dim=-1)
             # prompt_audio = processor.encode_audios_from_wav([concat_prompt_wav], sampling_rate=target_sr)[0]
-            
+
             # Construct full text prompt
             # prompt_text_speaker1 + prompt_text_speaker2 + text_to_generate
             full_prompt = ""
             if reference_text_s1: full_prompt += f"{reference_text_s1} "
             if reference_text_s2: full_prompt += f"{reference_text_s2} "
             full_prompt += text
-            
+
             # Concatenate wavs for the assistant prompt audio
             max_len = max([w.shape[-1] for w in ref_wavs])
             # We need to concat them along time dimension?
@@ -271,10 +284,22 @@ class MossTTSDNode:
             # sf.read returns (samples, channels) usually, but ALWAYS_2D=True
             # preprocess_audio returns (channels, samples).
             # We should probably mix down to mono if needed?
-            
+
             # Let's just concat for now.
             concat_wav = torch.cat(ref_wavs, dim=-1)
-            prompt_audio_list = self.processor.encode_audios_from_wav([concat_wav], sampling_rate=target_sr)
+
+            # Move audio_tokenizer to GPU temporarily for encoding
+            if hasattr(self, '_audio_tokenizer_device') and self._audio_tokenizer_device == "cpu":
+                torch.cuda.empty_cache()
+                self.processor.audio_tokenizer = self.processor.audio_tokenizer.to(self.device)
+
+            try:
+                prompt_audio_list = self.processor.encode_audios_from_wav([concat_wav], sampling_rate=target_sr)
+            finally:
+                if hasattr(self, '_audio_tokenizer_device') and self._audio_tokenizer_device == "cpu":
+                    self.processor.audio_tokenizer = self.processor.audio_tokenizer.cpu()
+                    torch.cuda.empty_cache()
+
             prompt_audio = prompt_audio_list[0]
 
             conversations = [
