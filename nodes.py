@@ -77,6 +77,33 @@ class MossTTSDNode:
             # Since codec path logic is similar, we could add a folder for it too,
             # currently just treating it as raw string or HF Hub ID unless we add specific folder logic.
         
+        # Workaround for transformers bug with "v1.0" in repo name causing import errors
+        if model_path == "OpenMOSS-Team/MOSS-TTSD-v1.0":
+            try:
+                from huggingface_hub import snapshot_download
+                import os
+                
+                # Define sanitized local path
+                # Use folder_paths if available, otherwise relative to current file
+                if folder_paths:
+                    base_path = os.path.join(folder_paths.models_dir, "moss_ttsd")
+                else:
+                    base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "moss_ttsd")
+                
+                sanitized_name = "MOSS-TTSD-v1_0" # Replace dot with underscore
+                local_model_path = os.path.join(base_path, sanitized_name)
+                
+                if not os.path.exists(local_model_path):
+                    print(f"Downloading MOSS-TTSD to {local_model_path} to avoid import errors...")
+                    snapshot_download(repo_id=model_path, local_dir=local_model_path)
+                
+                print(f"Redirecting 'OpenMOSS-Team/MOSS-TTSD-v1.0' to local sanitized path: {local_model_path}")
+                model_path = local_model_path
+                
+            except Exception as e:
+                print(f"Failed to auto-download/redirect model: {e}")
+                print("Falling back to default HF loading (might fail with ModuleNotFoundError).")
+
         if self.model is None or self.processor is None:
             print(f"Loading MOSS-TTSD model from {model_path}...")
             self.processor = AutoProcessor.from_pretrained(
