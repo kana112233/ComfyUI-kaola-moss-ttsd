@@ -84,6 +84,7 @@ class MossTTSDNode:
                 "text": ("STRING", {"multiline": True, "default": "[S1] Hello world."}),
                 "model_path": (model_options,),
                 "codec_path": (codec_options,),
+                "quantization": (["none", "8bit", "4bit"], {"default": "none"}),
                 "temperature": ("FLOAT", {"default": 1.1, "min": 0.1, "max": 2.0, "step": 0.1}),
                 "top_p": ("FLOAT", {"default": 0.9, "min": 0.1, "max": 1.0, "step": 0.05}),
                 "repetition_penalty": ("FLOAT", {"default": 1.1, "min": 1.0, "max": 2.0, "step": 0.1}),
@@ -219,11 +220,11 @@ class MossTTSDNode:
             
         return waveform
 
-    def generate(self, text, model_path, codec_path, temperature, top_p, repetition_penalty, max_new_tokens,
+    def generate(self, text, model_path, codec_path, quantization, temperature, top_p, repetition_penalty, max_new_tokens,
                  reference_audio_s1=None, reference_text_s1=None, 
                  reference_audio_s2=None, reference_text_s2=None):
         
-        self.load_model(model_path, codec_path)
+        self.load_model(model_path, codec_path, quantization)
         target_sr = int(self.processor.model_config.sampling_rate)
         
         audio_inputs = []
