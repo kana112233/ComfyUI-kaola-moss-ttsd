@@ -1,0 +1,1 @@
+MOSS-TTSD (text to spoken dialogue) is an open-source bilingual spoken dialogue synthesis model that supports both Chinese and English. It can transform dialogue scripts between two speakers into natural, expressive conversational speech. MOSS-TTSD supports voice cloning and single-session speech generation of up to 960 seconds, making it ideal for AI podcast production.
