@@ -37,6 +37,17 @@ try:
 except ImportError:
     print("Failed to patch Qwen3 support: transformers.models.qwen2 not found.")
 
+# Monkey-patch for PreTrainedConfig in configuration_utils
+# Some versions or environments might fail to expose it directly in configuration_utils due to circular imports or structure changes.
+try:
+    import transformers.configuration_utils
+    if not hasattr(transformers.configuration_utils, "PreTrainedConfig"):
+        if hasattr(transformers, "PreTrainedConfig"):
+            transformers.configuration_utils.PreTrainedConfig = transformers.PreTrainedConfig
+            print("Monkey-patched transformers.configuration_utils.PreTrainedConfig")
+except ImportError:
+    pass
+
 # Try to import folder_paths from comfy
 try:
     import folder_paths
