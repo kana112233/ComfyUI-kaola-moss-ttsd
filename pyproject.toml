@@ -1,0 +1,16 @@
+[project]
+name = "comfyui-kaola-moss-ttsd"
+description = "ComfyUI node for MOSS-TTSD (Text to Spoken Dialogue generation)"
+version = "0.0.1"
+license = { file = "LICENSE" }
+dependencies = ["torchaudio", "transformers", "soundfile", "numpy"]
+
+[project.urls]
+Repository = "https://github.com/Startgame/ComfyUI-kaola-moss-ttsd"
+# Used by Comfy Registry
+# Homepage = ""
+
+[tool.comfy]
+PublisherId = "kaola"
+DisplayName = "ComfyUI Kaola MOSS-TTSD"
+Icon = ""
