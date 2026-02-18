@@ -1,92 +1,85 @@
 {
     "last_node_id": 4,
-    "last_link_id": 4,
+    "last_link_id": 3,
     "nodes": [
         {
             "id": 1,
-            "type": "ExampleNode",
+            "type": "MossTTSDNode",
             "pos": [
-                400,
-                200
+                100,
+                100
             ],
-            "size": {
-                "0": 315,
-                "1": 150
+            "size": [
+                400,
+                300
+            ],
+            "flags": {},
+            "order": 0,
+            "mode": 0,
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "audio",
+                    "type": "AUDIO",
+                    "links": [
+                        1
+                    ],
+                    "shape": 3,
+                    "slot_index": 0
+                }
+            ],
+            "properties": {
+                "Node name for S&R": "MossTTSDNode"
             },
+            "widgets_values": [
+                "[S1] Hello there! This is an example of MOSS-TTSD generation.",
+                "OpenMOSS-Team/MOSS-TTSD-v1.0",
+                "OpenMOSS-Team/MOSS-Audio-Tokenizer",
+                1.1,
+                0.9,
+                1.1,
+                2000,
+                "",
+                ""
+            ]
+        },
+        {
+            "id": 2,
+            "type": "PreviewAudio",
+            "pos": [
+                600,
+                100
+            ],
+            "size": [
+                300,
+                100
+            ],
             "flags": {},
             "order": 1,
             "mode": 0,
             "inputs": [
                 {
-                    "name": "image",
-                    "type": "IMAGE",
-                    "link": null
-                },
-                {
-                    "name": "mask",
-                    "type": "MASK",
-                    "link": null
+                    "name": "audio",
+                    "type": "AUDIO",
+                    "link": 1
                 }
             ],
-            "outputs": [
-                {
-                    "name": "image",
-                    "type": "IMAGE",
-                    "links": [],
-                    "shape": 3,
-                    "slot_index": 0
-                },
-                {
-                    "name": "value",
-                    "type": "INT",
-                    "links": [],
-                    "shape": 3,
-                    "slot_index": 1
-                },
-                {
-                    "name": "text",
-                    "type": "STRING",
-                    "links": [],
-                    "shape": 3,
-                    "slot_index": 2
-                }
-            ],
-            "properties": {
-                "Node name for S&R": "ExampleNode"
-            },
-            "widgets_values": [
-                20,
-                1.5,
-                "Hello World with Device!",
-                "option1",
-                "cpu"
-            ]
-        },
-        {
-            "id": 2,
-            "type": "Note",
-            "pos": [
-                50,
-                200
-            ],
-            "size": {
-                "0": 300,
-                "1": 100
-            },
-            "flags": {},
-            "order": 0,
-            "mode": 0,
-            "inputs": [],
             "outputs": [],
-            "properties": {},
-            "widgets_values": [
-                "This is an example workflow for the ComfyUI Node Template.\nThe ExampleNode supports device selection and progress bar updates."
-            ],
-            "color": "#232",
-            "bgcolor": "#333"
+            "properties": {
+                "Node name for S&R": "PreviewAudio"
+            }
         }
     ],
-    "links": [],
+    "links": [
+        [
+            1,
+            1,
+            0,
+            2,
+            0,
+            "AUDIO"
+        ]
+    ],
     "groups": [],
     "config": {},
     "extra": {},

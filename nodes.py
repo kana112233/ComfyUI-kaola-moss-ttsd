@@ -14,6 +14,14 @@ if moss_path not in sys.path:
 
 from transformers import AutoModel, AutoProcessor
 
+# Try to import folder_paths from comfy
+try:
+    import folder_paths
+    # Add a new folder type for moss_ttsd models
+    folder_paths.add_model_folder_path("moss_ttsd", os.path.join(folder_paths.models_dir, "moss_ttsd"))
+except ImportError:
+    folder_paths = None
+
 class MossTTSDNode:
     def __init__(self):
         self.model = None
@@ -23,11 +31,25 @@ class MossTTSDNode:
 
     @classmethod
     def INPUT_TYPES(s):
+        # Default options
+        model_options = ["OpenMOSS-Team/MOSS-TTSD-v1.0"]
+        codec_options = ["OpenMOSS-Team/MOSS-Audio-Tokenizer"]
+        
+        if folder_paths:
+            # Get list of local models if available
+            local_models = folder_paths.get_filename_list("moss_ttsd")
+            if local_models:
+                 model_options.extend(local_models)
+            
+            # Also check LLM folder? Or just keep it strictly moss_ttsd for now.
+            # We can also look in 'LLM' or 'transformers' folders if they exist
+            # but let's stick to specific folder or HF ID.
+        
         return {
             "required": {
                 "text": ("STRING", {"multiline": True, "default": "[S1] Hello world."}),
-                "model_path": ("STRING", {"default": "OpenMOSS-Team/MOSS-TTSD-v1.0"}),
-                "codec_path": ("STRING", {"default": "OpenMOSS-Team/MOSS-Audio-Tokenizer"}),
+                "model_path": (model_options,),
+                "codec_path": (codec_options,),
                 "temperature": ("FLOAT", {"default": 1.1, "min": 0.1, "max": 2.0, "step": 0.1}),
                 "top_p": ("FLOAT", {"default": 0.9, "min": 0.1, "max": 1.0, "step": 0.05}),
                 "repetition_penalty": ("FLOAT", {"default": 1.1, "min": 1.0, "max": 2.0, "step": 0.1}),
@@ -47,6 +69,14 @@ class MossTTSDNode:
     CATEGORY = "Kaola/MOSS-TTSD"
 
     def load_model(self, model_path, codec_path):
+        # Resolve paths if they are local filenames
+        if folder_paths:
+            if model_path in folder_paths.get_filename_list("moss_ttsd"):
+                 model_path = folder_paths.get_full_path("moss_ttsd", model_path)
+            
+            # Since codec path logic is similar, we could add a folder for it too,
+            # currently just treating it as raw string or HF Hub ID unless we add specific folder logic.
+        
         if self.model is None or self.processor is None:
             print(f"Loading MOSS-TTSD model from {model_path}...")
             self.processor = AutoProcessor.from_pretrained(
