@@ -103,7 +103,11 @@ class MossTTSDNode:
     FUNCTION = "generate"
     CATEGORY = "Kaola/MOSS-TTSD"
 
-    def load_model(self, model_path, codec_path):
+    def load_model(self, model_path, codec_path, quantization="none"):
+        if quantization != "none" and self.device == "cpu":
+            print("Quantization not supported on CPU. Forcing 'none'.")
+            quantization = "none"
+
         # Resolve paths if they are local filenames
         if folder_paths:
             if model_path in folder_paths.get_filename_list("moss_ttsd"):
@@ -181,6 +185,15 @@ class MossTTSDNode:
                 model_kwargs["device_map"] = "auto"
                 model_kwargs["low_cpu_mem_usage"] = True
             
+            # Application of Quantization
+            if quantization == "8bit":
+                model_kwargs["load_in_8bit"] = True
+                print("Loading model in 8-bit precision...")
+            elif quantization == "4bit":
+                model_kwargs["load_in_4bit"] = True
+                model_kwargs["bnb_4bit_compute_dtype"] = torch.float16
+                print("Loading model in 4-bit precision...")
+
             attn_implementation = "flash_attention_2" if self.device == "cuda" else "sdpa"
             try:
                 self.model = AutoModel.from_pretrained(
@@ -196,7 +209,7 @@ class MossTTSDNode:
                     **model_kwargs
                 )
 
-            if not use_accelerate:
+            if not use_accelerate and quantization == "none":
                 self.model = self.model.to(self.device)
             
             self.model = self.model.eval()
