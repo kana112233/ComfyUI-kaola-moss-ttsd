@@ -152,10 +152,13 @@ class MossTTSDNode:
 
         if self.model is None or self.processor is None:
             print(f"Loading MOSS-TTSD model from {model_path}...")
+            # Use use_fast=False to avoid "data did not match any variant of untagged enum ModelWrapper"
+            # which happens when local tokenizers library is too old for the model's tokenizer.json
             self.processor = AutoProcessor.from_pretrained(
                 model_path,
                 trust_remote_code=True,
                 codec_path=codec_path,
+                use_fast=False,
             )
             self.processor.audio_tokenizer = self.processor.audio_tokenizer.to(self.device).eval()
             
