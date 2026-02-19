@@ -300,10 +300,17 @@ class MossTTSDGenerate:
         elif mode == "voice_clone":
             # Voice cloning: encode each speaker's reference audio separately
             # User message includes reference audio codes, mode = "generation" (odd-length conversation)
+            print(f"[MOSS-TTSD] voice_clone mode: encoding {len(ref_wavs)} reference audio(s)")
+            for i, rw in enumerate(ref_wavs):
+                print(f"  ref_wav[{i}] shape={rw.shape}, ref_text='{ref_texts[i][:50]}...'")
             with torch.no_grad():
                 reference = processor.encode_audios_from_wav(ref_wavs, sampling_rate=target_sr)
-            # Pad to match speaker indices: [S1]=ref[0], [S2]=ref[1] or None
+            print(f"[MOSS-TTSD] Encoded reference: {len(reference)} items")
+            for i, ref in enumerate(reference):
+                print(f"  reference[{i}] shape={ref.shape}")
             conversations = [[processor.build_user_message(text=text, reference=reference)]]
+            print(f"[MOSS-TTSD] Conversation content keys: {list(conversations[0][0].keys())}")
+            print(f"[MOSS-TTSD] audio_codes_list length: {len(conversations[0][0].get('audio_codes_list', []))}")
             processor_mode = "generation"
 
         elif mode == "continuation":
