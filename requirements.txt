@@ -1,6 +1,6 @@
 torch
 torchaudio
-transformers>=4.57.0
+transformers>=5.0.0
 safetensors
 numpy
 orjson
