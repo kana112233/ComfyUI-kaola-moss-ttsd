@@ -8,7 +8,7 @@ dependencies = ["torchaudio", "transformers", "soundfile", "numpy"]
 [project.urls]
 Repository = "https://github.com/kana112233/ComfyUI-kaola-moss-ttsd"
 # Used by Comfy Registry
-Homepage = "https://github.com/kana112233/ComfyUI-kaola-moss-ttsd"
+Homepage = "https://registry.comfy.org/publishers/kaola/nodes/comfyui-kaola-moss-ttsd"
 
 [tool.comfy]
 PublisherId = "kaola"
