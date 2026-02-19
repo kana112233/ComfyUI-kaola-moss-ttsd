@@ -5,9 +5,48 @@ import torchaudio
 import soundfile as sf
 import numpy as np
 from pathlib import Path
+from contextlib import contextmanager
+from tqdm import tqdm as _original_tqdm
 
 from transformers import AutoModel, AutoProcessor, AutoTokenizer, AutoConfig
 from transformers.dynamic_module_utils import get_class_from_dynamic_module
+
+# Try to import ComfyUI's progress bar utility
+try:
+    import comfy.utils
+    HAS_COMFY_PBAR = True
+except ImportError:
+    HAS_COMFY_PBAR = False
+
+
+class ComfyUITqdm(_original_tqdm):
+    """A tqdm wrapper that also updates ComfyUI's ProgressBar."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if HAS_COMFY_PBAR and self.total:
+            self._comfy_pbar = comfy.utils.ProgressBar(self.total)
+        else:
+            self._comfy_pbar = None
+
+    def update(self, n=1):
+        super().update(n)
+        if self._comfy_pbar:
+            self._comfy_pbar.update_absolute(self.n, self.total)
+
+
+@contextmanager
+def _patch_tqdm_for_comfyui(model):
+    """Temporarily replace tqdm in the model's module with ComfyUITqdm."""
+    model_module = sys.modules.get(type(model).__module__)
+    if model_module and hasattr(model_module, 'tqdm'):
+        original = model_module.tqdm
+        model_module.tqdm = ComfyUITqdm
+        try:
+            yield
+        finally:
+            model_module.tqdm = original
+    else:
+        yield
 
 # Try to import folder_paths
 try:
@@ -371,7 +410,7 @@ class MossTTSDGenerate:
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
 
-        with torch.no_grad():
+        with torch.no_grad(), _patch_tqdm_for_comfyui(model):
             outputs = model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
