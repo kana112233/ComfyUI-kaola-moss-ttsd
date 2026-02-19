@@ -32,7 +32,7 @@ class MossVoiceGeneratorLoadModel:
             "required": {
                 "model_path": (model_options,),
                 "device": (["auto", "cuda", "cpu", "mps"], {"default": "auto"}),
-                "precision": (["fp32", "fp16", "bf16"], {"default": "fp32"}),
+                "precision": (["fp32", "bf16"], {"default": "fp32"}),
             },
             "optional": {
                 "moss_codec": ("MOSS_AUDIO_CODEC",),
@@ -67,9 +67,7 @@ class MossVoiceGeneratorLoadModel:
         
         # Precision selection
         dtype = torch.float32
-        if precision == "fp16":
-            dtype = torch.float16
-        elif precision == "bf16":
+        if precision == "bf16":
             dtype = torch.bfloat16
 
         # Prepare kwargs
