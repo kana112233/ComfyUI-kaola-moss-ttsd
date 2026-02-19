@@ -124,6 +124,14 @@ class MossVoiceGeneratorLoadModel:
             # Simple check for flash attention availability
             try:
                 import flash_attn
+                # Also check if metadata exists, as transformers relies on it
+                from importlib.metadata import version, PackageNotFoundError
+                try:
+                    version("flash_attn")
+                except PackageNotFoundError:
+                    print("[MOSS-VoiceGenerator] flash_attn package metadata not found. Falling back to sdpa.")
+                    raise ImportError("flash_attn metadata missing")
+
                 if dtype in [torch.float16, torch.bfloat16]:
                     major, _ = torch.cuda.get_device_capability()
                     if major >= 8:
