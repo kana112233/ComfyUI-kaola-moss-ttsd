@@ -38,8 +38,11 @@ class MossVoiceGeneratorLoadModel:
 
     RETURN_TYPES = ("MOSS_VOICE_GENERATOR_MODEL",)
     RETURN_NAMES = ("moss_vg_model",)
+    RETURN_TYPES = ("MOSS_VOICE_GENERATOR_MODEL",)
+    RETURN_NAMES = ("moss_vg_model",)
     FUNCTION = "load_model"
     CATEGORY = "Kaola/MOSS-TTSD"
+    DESCRIPTION = "Loads the MOSS-VoiceGenerator model, used for creating speaker timbres from text descriptions."
 
     def load_model(self, model_path, device, precision):
         # Auto-download if needed (mirroring behavior of MOSS-TTSD)
@@ -139,7 +142,11 @@ class MossVoiceGeneratorGenerate:
     RETURN_TYPES = ("AUDIO",)
     RETURN_NAMES = ("audio",)
     FUNCTION = "generate"
+    RETURN_TYPES = ("AUDIO",)
+    RETURN_NAMES = ("audio",)
+    FUNCTION = "generate"
     CATEGORY = "Kaola/MOSS-TTSD"
+    DESCRIPTION = "Generates a voice sample based on a text description (Instruction). The output can be used as specific Reference Audio for MOSS-TTSD's 'voice_clone' mode."
 
     def generate(self, moss_vg_model, text, instruction, audio_temperature, audio_top_p, audio_top_k, audio_repetition_penalty, max_new_tokens, text_normalize):
         model = moss_vg_model["model"]

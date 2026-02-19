@@ -56,6 +56,7 @@ class MossAudioCodecLoadModel:
     RETURN_NAMES = ("moss_codec",)
     FUNCTION = "load_codec"
     CATEGORY = "Kaola/MOSS-TTSD"
+    DESCRIPTION = "Loads the MOSS-Audio-Tokenizer codec model required for audio encoding/decoding."
 
     def load_codec(self, codec_path):
         if codec_path == "OpenMOSS-Team/MOSS-Audio-Tokenizer":
@@ -96,6 +97,7 @@ class MossTTSDLoadModel:
     RETURN_NAMES = ("moss_model",)
     FUNCTION = "load_model"
     CATEGORY = "Kaola/MOSS-TTSD"
+    DESCRIPTION = "Loads the MOSS-TTSD model. Supports 4-bit and 8-bit quantization for lower memory usage."
 
     def load_model(self, model_path, quantization):
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -230,7 +232,11 @@ class MossTTSDGenerate:
     RETURN_TYPES = ("AUDIO",)
     RETURN_NAMES = ("audio",)
     FUNCTION = "generate"
+    RETURN_TYPES = ("AUDIO",)
+    RETURN_NAMES = ("audio",)
+    FUNCTION = "generate"
     CATEGORY = "Kaola/MOSS-TTSD"
+    DESCRIPTION = "Generates speech using MOSS-TTSD. Supports multiple modes: 'generation' (text-only), 'voice_clone' (clones from audio), 'continuation' (continues from reference), and 'voice_clone_and_continuation' (best for cloning + style). Supports up to 5 speakers [S1]-[S5]."
 
     def preprocess_audio(self, audio_data, target_sr):
         waveform = audio_data["waveform"]
