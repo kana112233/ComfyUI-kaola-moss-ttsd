@@ -104,6 +104,7 @@ You can use `huggingface-cli` to download:
 ```bash
 huggingface-cli download OpenMOSS-Team/MOSS-TTSD-v1.0 --local-dir ComfyUI/models/moss_ttsd/MOSS-TTSD-v1.0
 huggingface-cli download OpenMOSS-Team/MOSS-VoiceGenerator --local-dir ComfyUI/models/moss_ttsd/MOSS-VoiceGenerator
+huggingface-cli download OpenMOSS-Team/MOSS-SoundEffect --local-dir ComfyUI/models/moss_ttsd/MOSS-SoundEffect
 huggingface-cli download OpenMOSS-Team/MOSS-Audio-Tokenizer --local-dir ComfyUI/models/moss_ttsd/MOSS-Audio-Tokenizer
 ```
 
