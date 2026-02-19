@@ -127,15 +127,15 @@ class MossVoiceGeneratorGenerate:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "moss_vg_model": ("MOSS_VOICE_GENERATOR_MODEL",),
-                "text": ("STRING", {"multiline": True, "default": "Hello, this is a test."}),
-                "instruction": ("STRING", {"multiline": True, "default": "A clear, neutral voice for reading."}), 
-                "audio_temperature": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 2.0, "step": 0.1}),
-                "audio_top_p": ("FLOAT", {"default": 0.8, "min": 0.1, "max": 1.0, "step": 0.05}),
-                "audio_top_k": ("INT", {"default": 50, "min": 1, "max": 200}),
-                "audio_repetition_penalty": ("FLOAT", {"default": 1.0, "min": 1.0, "max": 2.0, "step": 0.1}),
-                "max_new_tokens": ("INT", {"default": 2000, "min": 100, "max": 10000}),
-                "text_normalize": ("BOOLEAN", {"default": True}),
+                "moss_vg_model": ("MOSS_VOICE_GENERATOR_MODEL", {"tooltip": "Loaded MOSS-VoiceGenerator model."}),
+                "text": ("STRING", {"multiline": True, "default": "Hello, this is a test.", "tooltip": "The content to be spoken."}),
+                "instruction": ("STRING", {"multiline": True, "default": "A clear, neutral voice for reading.", "tooltip": "Describe the desired voice characteristics (gender, age, tone, emotion)."}), 
+                "audio_temperature": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 2.0, "step": 0.1, "tooltip": "Higher = more variation/drama."}),
+                "audio_top_p": ("FLOAT", {"default": 0.8, "min": 0.1, "max": 1.0, "step": 0.05, "tooltip": "Nucleus sampling probability."}),
+                "audio_top_k": ("INT", {"default": 50, "min": 1, "max": 200, "tooltip": "Top-K sampling."}),
+                "audio_repetition_penalty": ("FLOAT", {"default": 1.0, "min": 1.0, "max": 2.0, "step": 0.1, "tooltip": "Penalty for repeating audio tokens."}),
+                "max_new_tokens": ("INT", {"default": 2000, "min": 100, "max": 10000, "tooltip": "Max audio length in tokens."}),
+                "text_normalize": ("BOOLEAN", {"default": True, "tooltip": "Normalize text input."}),
             }
         }
 
