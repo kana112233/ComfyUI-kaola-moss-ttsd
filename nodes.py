@@ -243,6 +243,7 @@ class MossTTSDGenerate:
                 "moss_model": ("MOSS_TTSD_MODEL",),
                 "moss_codec": ("MOSS_AUDIO_CODEC",),
                 "text": ("STRING", {"multiline": True, "default": "[S1] Hello world."}),
+                "mode": (["generation", "voice_clone", "continuation", "voice_clone_and_continuation"], {"default": "voice_clone"}),
                 "audio_temperature": ("FLOAT", {"default": 1.1, "min": 0.1, "max": 2.0, "step": 0.1}),
                 "audio_top_p": ("FLOAT", {"default": 0.9, "min": 0.1, "max": 1.0, "step": 0.05}),
                 "audio_repetition_penalty": ("FLOAT", {"default": 1.1, "min": 1.0, "max": 2.0, "step": 0.1}),
@@ -270,7 +271,7 @@ class MossTTSDGenerate:
             waveform = torchaudio.functional.resample(waveform, sr, target_sr)
         return waveform
 
-    def generate(self, moss_model, moss_codec, text, audio_temperature, audio_top_p, audio_repetition_penalty, text_temperature, max_new_tokens,
+    def generate(self, moss_model, moss_codec, text, mode, audio_temperature, audio_top_p, audio_repetition_penalty, text_temperature, max_new_tokens,
                  reference_audio_s1=None, reference_text_s1=None, 
                  reference_audio_s2=None, reference_text_s2=None):
         
@@ -281,58 +282,87 @@ class MossTTSDGenerate:
         # Attach audio tokenizer from codec node
         if moss_codec:
              processor.audio_tokenizer = moss_codec["audio_tokenizer"]
-             # Check device of audio tokenizer? keep on CPU.
              processor.audio_tokenizer = processor.audio_tokenizer.cpu()
 
         target_sr = int(processor.model_config.sampling_rate)
         
-        audio_inputs = []
-        if reference_audio_s1: audio_inputs.append(self.preprocess_audio(reference_audio_s1, target_sr))
-        if reference_audio_s2: audio_inputs.append(self.preprocess_audio(reference_audio_s2, target_sr))
+        # Collect reference audio/text pairs per speaker
+        ref_wavs = []
+        ref_texts = []
+        if reference_audio_s1 and reference_text_s1:
+            ref_wavs.append(self.preprocess_audio(reference_audio_s1, target_sr))
+            ref_texts.append(reference_text_s1)
+        if reference_audio_s2 and reference_text_s2:
+            ref_wavs.append(self.preprocess_audio(reference_audio_s2, target_sr))
+            ref_texts.append(reference_text_s2)
+
+        has_reference = len(ref_wavs) > 0
+
+        # Auto-fallback: if no reference provided but mode requires it, fall back to generation
+        if not has_reference and mode != "generation":
+            print(f"Warning: mode='{mode}' requires reference audio. Falling back to 'generation'.")
+            mode = "generation"
             
-        if audio_inputs:
-            ref_wavs = audio_inputs # Already list of tensors
-            
-            # Ensure audio tokenizer is on CPU
-            processor.audio_tokenizer = processor.audio_tokenizer.cpu()
-            torch.cuda.empty_cache()
-            
+        # Build conversation based on mode (follows official MOSS-TTSD inference logic)
+        if mode == "generation":
+            # Pure generation: just text, no reference
+            conversations = [[processor.build_user_message(text=text)]]
+            processor_mode = "generation"
+
+        elif mode == "voice_clone":
+            # Voice cloning: encode each speaker's reference audio separately
+            # User message includes reference audio codes, mode = "generation" (odd-length conversation)
             with torch.no_grad():
-                reference_audio_codes = processor.encode_audios_from_wav(ref_wavs, sampling_rate=target_sr)
+                reference = processor.encode_audios_from_wav(ref_wavs, sampling_rate=target_sr)
+            # Pad to match speaker indices: [S1]=ref[0], [S2]=ref[1] or None
+            conversations = [[processor.build_user_message(text=text, reference=reference)]]
+            processor_mode = "generation"
 
-            full_prompt = ""
-            if reference_text_s1: full_prompt += f"{reference_text_s1} "
-            if reference_text_s2: full_prompt += f"{reference_text_s2} "
-            full_prompt += text
+        elif mode == "continuation":
+            # Continuation: prefix text with reference texts, concat audio as prompt
+            prefixed_text = ""
+            for i, rt in enumerate(ref_texts):
+                tag = f"[S{i+1}]"
+                if not rt.lstrip().startswith(tag):
+                    rt = f"{tag}{rt}"
+                prefixed_text += rt
+            prefixed_text += text
 
+            # Encode concatenated reference audio as prompt
             concat_wav = torch.cat(ref_wavs, dim=-1)
+            with torch.no_grad():
+                prompt_audio = processor.encode_audios_from_wav([concat_wav], sampling_rate=target_sr)[0]
+
+            conversations = [[
+                processor.build_user_message(text=prefixed_text),
+                processor.build_assistant_message(audio_codes_list=[prompt_audio]),
+            ]]
+            processor_mode = "continuation"
+
+        elif mode == "voice_clone_and_continuation":
+            # Combined: reference in user message + prompt audio in assistant message
+            prefixed_text = ""
+            for i, rt in enumerate(ref_texts):
+                tag = f"[S{i+1}]"
+                if not rt.lstrip().startswith(tag):
+                    rt = f"{tag}{rt}"
+                prefixed_text += rt
+            prefixed_text += text
 
             with torch.no_grad():
-                prompt_audio_list = processor.encode_audios_from_wav([concat_wav], sampling_rate=target_sr)
-            
-            prompt_audio = prompt_audio_list[0]
+                reference = processor.encode_audios_from_wav(ref_wavs, sampling_rate=target_sr)
+            concat_wav = torch.cat(ref_wavs, dim=-1)
+            with torch.no_grad():
+                prompt_audio = processor.encode_audios_from_wav([concat_wav], sampling_rate=target_sr)[0]
 
-            conversations = [
-                [
-                    processor.build_user_message(
-                        text=full_prompt,
-                        reference=reference_audio_codes,
-                    ),
-                    processor.build_assistant_message(
-                        audio_codes_list=[prompt_audio]
-                    ),
-                ],
-            ]
-        else:
-            # generation mode: conversation must have ODD length, last message = user
-            conversations = [
-                [
-                    processor.build_user_message(text=text),
-                ]
-            ]
+            conversations = [[
+                processor.build_user_message(text=prefixed_text, reference=reference),
+                processor.build_assistant_message(audio_codes_list=[prompt_audio]),
+            ]]
+            processor_mode = "continuation"
 
         # Inference
-        batch = processor(conversations, mode="continuation" if audio_inputs else "generation")
+        batch = processor(conversations, mode=processor_mode)
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
 
