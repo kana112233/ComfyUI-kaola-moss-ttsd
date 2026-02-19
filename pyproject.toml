@@ -6,9 +6,9 @@ license = { file = "LICENSE" }
 dependencies = ["torchaudio", "transformers", "soundfile", "numpy"]
 
 [project.urls]
-Repository = "https://github.com/Startgame/ComfyUI-kaola-moss-ttsd"
+Repository = "https://github.com/kana112233/ComfyUI-kaola-moss-ttsd"
 # Used by Comfy Registry
-# Homepage = ""
+Homepage = "https://github.com/kana112233/ComfyUI-kaola-moss-ttsd"
 
 [tool.comfy]
 PublisherId = "kaola"
