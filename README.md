@@ -83,6 +83,7 @@ Two models are required:
 |-------|----------------|------|
 | MOSS-TTSD | [OpenMOSS-Team/MOSS-TTSD-v1.0](https://huggingface.co/OpenMOSS-Team/MOSS-TTSD-v1.0) | ~7GB |
 | MOSS-VoiceGenerator | [OpenMOSS-Team/MOSS-VoiceGenerator](https://huggingface.co/OpenMOSS-Team/MOSS-VoiceGenerator) | ~3GB |
+| MOSS-SoundEffect | [OpenMOSS-Team/MOSS-SoundEffect](https://huggingface.co/OpenMOSS-Team/MOSS-SoundEffect) | ~3GB |
 | MOSS-Audio-Tokenizer | [OpenMOSS-Team/MOSS-Audio-Tokenizer](https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer) | ~1GB |
 
 ### Auto Download
@@ -119,6 +120,13 @@ huggingface-cli download OpenMOSS-Team/MOSS-Audio-Tokenizer --local-dir ComfyUI/
     - **Instruction**: Describe the voice (e.g. "A clear, neutral voice", "年轻女性，温柔的声音").
     - **Text**: The initial content to speak with this voice.
     - **Output**: Returns an audio waveform that can be used as a *reference audio* for MOSS-TTSD `voice_clone` mode!
+
+### 3. MOSS-SoundEffect (Audio Generation)
+- **Load Model**: Use `Load MOSS Sound Effect Model` node.
+- **Generate**: Use `MOSS Sound Effect Generate` node.
+    - **Text**: Description (e.g., "birds chirping in a forest", "footsteps on wooden floor").
+    - **Duration**: Target duration in seconds (approx 12.5 tokens/sec).
+    - **Output**: Returns the generated sound effect audio.
 
 ## License
 Apache 2.0 (Inherited from MOSS-TTSD)
