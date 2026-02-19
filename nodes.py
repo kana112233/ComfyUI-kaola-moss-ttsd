@@ -360,9 +360,12 @@ class MossTTSDGenerate:
                 "mode": (["generation", "voice_clone", "continuation", "voice_clone_and_continuation"], {"default": "voice_clone"}),
                 "audio_temperature": ("FLOAT", {"default": 1.1, "min": 0.1, "max": 2.0, "step": 0.1}),
                 "audio_top_p": ("FLOAT", {"default": 0.9, "min": 0.1, "max": 1.0, "step": 0.05}),
+                "audio_top_k": ("INT", {"default": 50, "min": 1, "max": 200}),
                 "audio_repetition_penalty": ("FLOAT", {"default": 1.1, "min": 1.0, "max": 2.0, "step": 0.1}),
                 "text_temperature": ("FLOAT", {"default": 1.1, "min": 0.1, "max": 2.0, "step": 0.1}),
                 "max_new_tokens": ("INT", {"default": 2000, "min": 100, "max": 10000}),
+                "text_normalize": ("BOOLEAN", {"default": True}),
+                "sample_rate_normalize": ("BOOLEAN", {"default": True}),
             },
             "optional": optional,
         }
@@ -380,7 +383,7 @@ class MossTTSDGenerate:
             waveform = torchaudio.functional.resample(waveform, sr, target_sr)
         return waveform
 
-    def generate(self, moss_model, moss_codec, text, mode, audio_temperature, audio_top_p, audio_repetition_penalty, text_temperature, max_new_tokens, **kwargs):
+    def generate(self, moss_model, moss_codec, text, mode, audio_temperature, audio_top_p, audio_top_k, audio_repetition_penalty, text_temperature, max_new_tokens, text_normalize, sample_rate_normalize, **kwargs):
         
         model = moss_model["model"]
         processor = moss_model["processor"]
@@ -392,16 +395,40 @@ class MossTTSDGenerate:
              processor.audio_tokenizer = processor.audio_tokenizer.cpu()
 
         target_sr = int(processor.model_config.sampling_rate)
+
+        # Apply text normalization if enabled (recommended for all modes)
+        if text_normalize:
+            text = normalize_text(text)
         
         # Collect reference audio and text per speaker (S1-S5)
         ref_wavs = []
+        ref_audios_raw = []  # (waveform, sample_rate) for sample_rate_normalize
         ref_texts = []
         for i in range(1, self.MAX_SPEAKERS + 1):
             ref_audio = kwargs.get(f"reference_audio_s{i}")
             ref_text = kwargs.get(f"reference_text_s{i}")
             if ref_audio:
-                ref_wavs.append(self.preprocess_audio(ref_audio, target_sr))
+                ref_audios_raw.append((ref_audio["waveform"], ref_audio["sample_rate"]))
                 ref_texts.append(ref_text if ref_text else "")
+
+        # Sample rate normalization: resample all ref audio to lowest SR first
+        if sample_rate_normalize and len(ref_audios_raw) >= 2:
+            min_sr = min(sr for _, sr in ref_audios_raw)
+            print(f"[MOSS-TTSD] sample_rate_normalize: resampling to min_sr={min_sr} first")
+            for waveform, sr in ref_audios_raw:
+                if waveform.dim() == 3: waveform = waveform.squeeze(0)
+                if sr != min_sr:
+                    waveform = torchaudio.functional.resample(waveform, sr, min_sr)
+                if min_sr != target_sr:
+                    waveform = torchaudio.functional.resample(waveform, min_sr, target_sr)
+                ref_wavs.append(waveform)
+        else:
+            for ref_audio_data in ref_audios_raw:
+                waveform, sr = ref_audio_data
+                if waveform.dim() == 3: waveform = waveform.squeeze(0)
+                if sr != target_sr:
+                    waveform = torchaudio.functional.resample(waveform, sr, target_sr)
+                ref_wavs.append(waveform)
 
         has_reference = len(ref_wavs) > 0
 
@@ -449,7 +476,8 @@ class MossTTSDGenerate:
         elif mode == "continuation":
             # Continuation: prefix text with reference texts, concat audio as prompt
             prefixed_text = _build_prefixed_text(text, ref_texts)
-            prefixed_text = normalize_text(prefixed_text)
+            if text_normalize:
+                prefixed_text = normalize_text(prefixed_text)
             print(f"[MOSS-TTSD] continuation: prefixed_text: {prefixed_text[:300]}")
 
             concat_wav = torch.cat(ref_wavs, dim=-1)
@@ -467,7 +495,8 @@ class MossTTSDGenerate:
         elif mode == "voice_clone_and_continuation":
             # Combined: reference in user message + prompt audio in assistant message
             prefixed_text = _build_prefixed_text(text, ref_texts)
-            prefixed_text = normalize_text(prefixed_text)
+            if text_normalize:
+                prefixed_text = normalize_text(prefixed_text)
             print(f"[MOSS-TTSD] voice_clone_and_continuation: prefixed_text: {prefixed_text[:300]}")
 
             with torch.no_grad():
@@ -497,6 +526,7 @@ class MossTTSDGenerate:
                 max_new_tokens=max_new_tokens,
                 audio_temperature=audio_temperature,
                 audio_top_p=audio_top_p,
+                audio_top_k=audio_top_k,
                 audio_repetition_penalty=audio_repetition_penalty,
                 text_temperature=text_temperature,
             )
